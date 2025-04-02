@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Falling Notes</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden; /* Prevent scrollbars */
+            background-color: #f0f8ff; /* AliceBlue - a light pastel */
+            min-height: 100vh;
+            cursor: crosshair;
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end; /* Align text to bottom */
+            color: #b0c4de; /* LightSteelBlue */
+        }
+
+        .dot {
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            pointer-events: none; /* Prevent dots from interfering with clicks */
+            box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Define some pastel colors */
+        .pastel-pink { background-color: #ffb6c1; } /* LightPink */
+        .pastel-blue { background-color: #add8e6; } /* LightBlue */
+        .pastel-green { background-color: #98fb98; } /* PaleGreen */
+        .pastel-yellow { background-color: #ffffe0; } /* LightYellow */
+        .pastel-purple { background-color: #dda0dd; } /* Plum */
+
+        #instructions {
+            position: absolute;
+            bottom: 10px;
+            text-align: center;
+            width: 100%;
+            font-size: 0.9em;
+            color: #a9a9a9; /* DarkGray */
+            z-index: -1; /* Place behind dots */
+         }
+
+    </style>
+</head>
+<body>
+    <div id="instructions">Click anywhere to create a falling note.</div>
+
+    <script>
+        const body = document.body;
+        let audioContext;
+        const pastelColors = ['pastel-pink', 'pastel-blue', 'pastel-green', 'pastel-yellow', 'pastel-purple'];
+        const activeDots = []; // Keep track of dots for animation
+
+        // --- Sound Setup ---
+        function initAudio() {
+            if (!audioContext) {
+                try {
+                    // Standard context
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                } catch (e) {
+                    console.error("Web Audio API is not supported in this browser", e);
+                    alert("Sorry, your browser doesn't support the Web Audio API needed for sound.");
+                }
+            }
+        }
+
+        function playNote(xPosition) {
+            if (!audioContext) return; // Don't play if context failed
+
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            // Map xPosition (0 to window.innerWidth) to frequency (e.g., C4 to C6)
+            const minFreq = 261.63; // C4
+            const maxFreq = 1046.50; // C6
+            // Linear mapping: const frequency = minFreq + (xPosition / window.innerWidth) * (maxFreq - minFreq);
+             // Exponential (more musical) mapping over 2 octaves:
+            const frequency = minFreq * Math.pow(2, (xPosition / window.innerWidth) * 2);
+
+
+            oscillator.type = 'sine'; // Smooth, pleasant sound
+            oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+
+            // Envelope (attack, decay, sustain, release) - simple fade out
+            gainNode.gain.setValueAtTime(0.5, audioContext.currentTime); // Start at half volume
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.75); // Fade out over 0.75s
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.8); // Stop after fade out
+        }
+
+        // --- Dot Creation ---
+        function createDot(event) {
+            initAudio(); // Ensure audio context is ready on first click
+
+            const dot = document.createElement('div');
+            dot.classList.add('dot');
+
+            // Assign a random pastel color
+            const randomColorClass = pastelColors[Math.floor(Math.random() * pastelColors.length)];
+            dot.classList.add(randomColorClass);
+
+            const startX = event.clientX;
+            const startY = event.clientY;
+            dot.style.left = `${startX - 7}px`; // Center the dot on cursor
+            dot.style.top = `${startY - 7}px`;
+
+            body.appendChild(dot);
+
+            const dotInfo = {
+                element: dot,
+                x: startX,
+                y: startY,
+                vy: 1.5 + Math.random() * 1.5 // Initial velocity + small random variation
+            };
+            activeDots.push(dotInfo);
+        }
+
+        // --- Animation Loop ---
+        function animate() {
+            const bottomBoundary = window.innerHeight;
+
+            for (let i = activeDots.length - 1; i >= 0; i--) {
+                const dotInfo = activeDots[i];
+
+                // Apply gravity (increase velocity)
+                dotInfo.vy += 0.1;
+                // Update position
+                dotInfo.y += dotInfo.vy;
+
+                dotInfo.element.style.top = `${dotInfo.y - 7}px`;
+
+                // Check for collision with bottom
+                if (dotInfo.y + 7.5 >= bottomBoundary) { // +7.5 for half dot height
+                    playNote(dotInfo.x); // Play sound based on original x position
+                    body.removeChild(dotInfo.element); // Remove dot element
+                    activeDots.splice(i, 1); // Remove dot from active list
+                }
+            }
+
+            requestAnimationFrame(animate); // Continue the loop
+        }
+
+        // --- Event Listener ---
+        body.addEventListener('click', createDot);
+
+        // Start the animation loop
+        requestAnimationFrame(animate);
+
+    </script>
+</body>
+</html>
