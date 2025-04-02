@@ -27,12 +27,7 @@
             z-index: 10; /* Ensure dots are above zone dividers/labels */
         }
 
-        /* Define some pastel colors */
-        .pastel-pink { background-color: #ffb6c1; } /* LightPink */
-        .pastel-blue { background-color: #add8e6; } /* LightBlue */
-        .pastel-green { background-color: #98fb98; } /* PaleGreen */
-        .pastel-yellow { background-color: #ffffe0; } /* LightYellow */
-        .pastel-purple { background-color: #dda0dd; } /* Plum */
+        /* Pastel color classes removed - color set dynamically */
 
         #instructions {
             position: absolute;
@@ -70,12 +65,12 @@
 </head>
 <body>
     <!-- Zone dividers and labels will be added dynamically by JS -->
-    <div id="instructions">Click (or click and drag) in different horizontal zones to change the scale. Left-to-right position determines the pitch.</div>
+    <div id="instructions">Click (or click and drag). Zone changes scale (color hue), L-R position changes pitch (color lightness).</div>
 
     <script>
         const body = document.body;
         let audioContext;
-        const pastelColors = ['pastel-pink', 'pastel-blue', 'pastel-green', 'pastel-yellow', 'pastel-purple'];
+        // pastelColors array removed
         const activeDots = []; // Keep track of dots for animation
         let isDragging = false;
         let lastDragTime = 0;
@@ -84,12 +79,13 @@
         // --- Musical Scales Definition ---
         const baseFrequency = 261.63; // C4
         const scales = {
-            major:       { name: 'major', intervals: [0, 2, 4, 5, 7, 9, 11] },
-            natMinor:    { name: 'natural minor', intervals: [0, 2, 3, 5, 7, 8, 10] },
-            harMinor:    { name: 'harmonic minor', intervals: [0, 2, 3, 5, 7, 8, 11] },
-            majPent:     { name: 'major pentatonic', intervals: [0, 2, 4, 7, 9] },
-            blues:       { name: 'blues', intervals: [0, 3, 5, 6, 7, 10] },
-            chromatic:   { name: 'chromatic', intervals: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] } // Atonal-like
+            // Assigning distinct hues (0-360)
+            major:       { name: 'major', intervals: [0, 2, 4, 5, 7, 9, 11], colorHue: 210 }, // Blue
+            majPent:     { name: 'major pentatonic', intervals: [0, 2, 4, 7, 9], colorHue: 120 }, // Green
+            blues:       { name: 'blues', intervals: [0, 3, 5, 6, 7, 10], colorHue: 270 }, // Purple
+            natMinor:    { name: 'natural minor', intervals: [0, 2, 3, 5, 7, 8, 10], colorHue: 0 },   // Red
+            harMinor:    { name: 'harmonic minor', intervals: [0, 2, 3, 5, 7, 8, 11], colorHue: 30 },  // Orange
+            chromatic:   { name: 'chromatic', intervals: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], colorHue: null } // Grey (handled specially)
         };
         // Order can determine vertical position (top to bottom)
         const scaleOrder = ['major', 'majPent', 'blues', 'natMinor', 'harMinor', 'chromatic'];
@@ -157,20 +153,38 @@
 
             const dot = document.createElement('div');
             dot.classList.add('dot');
-            const randomColorClass = pastelColors[Math.floor(Math.random() * pastelColors.length)];
-            dot.classList.add(randomColorClass);
+            // Random color assignment removed
 
             const startX = event.clientX;
             const startY = event.clientY;
             dot.style.left = `${startX - 7}px`;
             dot.style.top = `${startY - 7}px`;
 
-            body.appendChild(dot);
-
             // Determine scale based on vertical zone (Y position)
             const zoneIndex = Math.min(Math.floor(startY / zoneHeight), numZones - 1); // Ensure index is valid
             const scaleKey = scaleOrder[zoneIndex];
             const currentScale = scales[scaleKey];
+
+            // --- Calculate Color based on Scale (Hue) and Pitch (Lightness) ---
+            const normalizedX = startX / window.innerWidth; // 0 (left) to 1 (right)
+            const minLightness = 40;
+            const maxLightness = 80;
+            // Reverse the lightness mapping: 0 (left) = maxLightness, 1 (right) = minLightness
+            const lightness = maxLightness - (normalizedX * (maxLightness - minLightness));
+            const saturation = 70; // Keep saturation constant for now
+
+            let dotColor;
+            if (currentScale.colorHue !== null) {
+                // Use HSL for scales with assigned hues
+                dotColor = `hsl(${currentScale.colorHue}, ${saturation}%, ${lightness}%)`;
+            } else {
+                // Use greyscale for chromatic (null hue)
+                dotColor = `hsl(0, 0%, ${lightness}%)`;
+            }
+            dot.style.backgroundColor = dotColor;
+            // --- End Color Calculation ---
+
+            body.appendChild(dot);
 
             const dotInfo = {
                 element: dot,
@@ -219,12 +233,22 @@
                 // Add Labels (positioned vertically)
                 const label = document.createElement('div');
                 label.classList.add('zone-label');
-                label.textContent = scales[scaleOrder[i]].name;
+                const scaleName = scales[scaleOrder[i]].name;
+                const scaleHue = scales[scaleOrder[i]].colorHue;
+                label.textContent = scaleName;
                 // Center label vertically within its zone
                 const labelY = (i * zoneHeight) + (zoneHeight / 2);
                 label.style.top = `${labelY}px`;
                 // Adjust for label height to truly center it
                 label.style.transform = 'translateY(-50%)';
+                // Optional: Color the label to match the zone hue
+                if (scaleHue !== null) {
+                    label.style.color = `hsl(${scaleHue}, 60%, 35%)`; // Darker, less saturated version of the hue
+                }
+                 else {
+                     label.style.color = `hsl(0, 0%, 40%)`; // Dark grey for chromatic
+                 }
+
                 body.appendChild(label);
             }
         }
