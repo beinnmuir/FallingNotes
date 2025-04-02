@@ -47,17 +47,17 @@
         /* Zone Styling */
         .zone-divider {
             position: absolute;
-            top: 0;
-            bottom: 0;
-            width: 1px;
+            left: 0;
+            right: 0;
+            height: 1px; /* Horizontal line */
             background-color: rgba(176, 196, 222, 0.5); /* LightSteelBlue, semi-transparent */
             z-index: 0; /* Behind everything else */
         }
 
         .zone-label {
             position: absolute;
-            top: 10px;
-            text-align: center;
+            left: 10px; /* Position from left edge */
+            text-align: left;
             width: auto; /* Let content determine width */
             font-size: 0.8em;
             color: #b0c4de; /* LightSteelBlue */
@@ -70,7 +70,7 @@
 </head>
 <body>
     <!-- Zone dividers and labels will be added dynamically by JS -->
-    <div id="instructions">Click (or click and drag) in different zones to create falling notes in various scales.</div>
+    <div id="instructions">Click (or click and drag) in different horizontal zones to change the scale. Left-to-right position determines the pitch.</div>
 
     <script>
         const body = document.body;
@@ -90,9 +90,10 @@
             majPent:     { name: 'major pentatonic', intervals: [0, 2, 4, 7, 9] },
             chromatic:   { name: 'chromatic', intervals: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] } // Atonal-like
         };
-        const scaleOrder = ['major', 'natMinor', 'harMinor', 'majPent', 'chromatic'];
+        // Order can determine vertical position (top to bottom)
+        const scaleOrder = ['major', 'majPent', 'natMinor', 'harMinor', 'chromatic'];
         const numZones = scaleOrder.length;
-        let zoneWidth = window.innerWidth / numZones;
+        let zoneHeight = window.innerHeight / numZones;
 
         // --- Sound Setup ---
         function initAudio() {
@@ -108,24 +109,27 @@
 
         // --- Calculate Frequency from Scale Note ---
         function getFrequency(semitonesFromBase) {
-            // Frequency = Base * 2^(Semitones / 12)
             return baseFrequency * Math.pow(2, semitonesFromBase / 12);
         }
 
-        // --- Play Note based on Scale and Position within Zone ---
-        function playNote(xPosition, scale) {
+        // --- Play Note based on Scale and X-Position ---
+        function playNote(xPosition, scale) { // Y position is implicit in the chosen scale
             if (!audioContext || !scale) return;
 
-            const zoneIndex = Math.floor(xPosition / zoneWidth);
-            const relativeX = (xPosition % zoneWidth) / zoneWidth; // Normalize X within zone (0 to 1)
+            // Normalize X across the entire screen width
+            const relativeX = xPosition / window.innerWidth;
 
             const intervals = scale.intervals;
             // Map relativeX to an index in the scale's intervals array
-            const noteIndexInScale = Math.floor(relativeX * intervals.length);
-            const semitones = intervals[noteIndexInScale];
+            // Multiply by number of octaves desired across the screen width (e.g., 2)
+            const octavesToSpan = 2;
+            const totalNotesInSpan = intervals.length * octavesToSpan;
+            const noteIndexOverall = Math.floor(relativeX * totalNotesInSpan);
 
-            // Optional: Add octave based on zone? Or keep simple for now.
-            const octaveShift = 0; // Can modify later
+            const noteIndexInScale = noteIndexOverall % intervals.length;
+            const octaveShift = Math.floor(noteIndexOverall / intervals.length);
+
+            const semitones = intervals[noteIndexInScale];
             const totalSemitones = semitones + (octaveShift * 12);
 
             const frequency = getFrequency(totalSemitones);
@@ -162,8 +166,8 @@
 
             body.appendChild(dot);
 
-            // Determine scale based on zone
-            const zoneIndex = Math.min(Math.floor(startX / zoneWidth), numZones - 1); // Ensure index is valid
+            // Determine scale based on vertical zone (Y position)
+            const zoneIndex = Math.min(Math.floor(startY / zoneHeight), numZones - 1); // Ensure index is valid
             const scaleKey = scaleOrder[zoneIndex];
             const currentScale = scales[scaleKey];
 
@@ -188,7 +192,7 @@
                 dotInfo.element.style.top = `${dotInfo.y - 7}px`;
 
                 if (dotInfo.y + 7.5 >= bottomBoundary) {
-                    playNote(dotInfo.x, dotInfo.scale); // Pass scale info to playNote
+                    playNote(dotInfo.x, dotInfo.scale); // Pass X pos and scale info
                     body.removeChild(dotInfo.element);
                     activeDots.splice(i, 1);
                 }
@@ -198,29 +202,28 @@
 
         // --- UI Setup (Dividers and Labels) ---
         function setupZones() {
-            // Clear existing dividers/labels if any (e.g., on resize)
             document.querySelectorAll('.zone-divider, .zone-label').forEach(el => el.remove());
 
-            zoneWidth = window.innerWidth / numZones;
+            zoneHeight = window.innerHeight / numZones;
 
             for (let i = 1; i < numZones; i++) {
-                // Add Dividers
+                // Add Horizontal Dividers
                 const divider = document.createElement('div');
                 divider.classList.add('zone-divider');
-                divider.style.left = `${i * zoneWidth}px`;
+                divider.style.top = `${i * zoneHeight}px`; // Position based on height
                 body.appendChild(divider);
             }
 
             for (let i = 0; i < numZones; i++) {
-                // Add Labels
+                // Add Labels (positioned vertically)
                 const label = document.createElement('div');
                 label.classList.add('zone-label');
                 label.textContent = scales[scaleOrder[i]].name;
-                // Center label within its zone
-                const labelX = (i * zoneWidth) + (zoneWidth / 2);
-                label.style.left = `${labelX}px`;
-                // Adjust for label width to truly center it
-                label.style.transform = 'translateX(-50%)';
+                // Center label vertically within its zone
+                const labelY = (i * zoneHeight) + (zoneHeight / 2);
+                label.style.top = `${labelY}px`;
+                // Adjust for label height to truly center it
+                label.style.transform = 'translateY(-50%)';
                 body.appendChild(label);
             }
         }
@@ -231,8 +234,7 @@
         });
         body.addEventListener('mousedown', (event) => {
             isDragging = true;
-            // No immediate dot on mousedown for cleaner drag start
-            initAudio(); // Ensure audio starts on interaction
+            initAudio();
         });
         body.addEventListener('mousemove', (event) => {
             if (isDragging) {
@@ -254,8 +256,8 @@
         window.addEventListener('resize', setupZones);
 
         // Initial Setup
-        setupZones(); // Draw zones initially
-        requestAnimationFrame(animate); // Start the animation loop
+        setupZones();
+        requestAnimationFrame(animate);
 
     </script>
 </body>
