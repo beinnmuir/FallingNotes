@@ -47,13 +47,16 @@
     </style>
 </head>
 <body>
-    <div id="instructions">Click anywhere to create a falling note.</div>
+    <div id="instructions">Click (or click and drag) anywhere to create falling notes.</div>
 
     <script>
         const body = document.body;
         let audioContext;
         const pastelColors = ['pastel-pink', 'pastel-blue', 'pastel-green', 'pastel-yellow', 'pastel-purple'];
         const activeDots = []; // Keep track of dots for animation
+        let isDragging = false;
+        let lastDragTime = 0;
+        const dragThrottleInterval = 50; // Milliseconds between dot creation during drag
 
         // --- Sound Setup ---
         function initAudio() {
@@ -98,7 +101,7 @@
 
         // --- Dot Creation ---
         function createDot(event) {
-            initAudio(); // Ensure audio context is ready on first click
+            initAudio(); // Ensure audio context is ready on first interaction
 
             const dot = document.createElement('div');
             dot.classList.add('dot');
@@ -148,8 +151,41 @@
             requestAnimationFrame(animate); // Continue the loop
         }
 
-        // --- Event Listener ---
-        body.addEventListener('click', createDot);
+        // --- Event Listeners ---
+        body.addEventListener('click', (event) => {
+             // Keep click for single, non-drag interactions
+             if (!isDragging) { // Only create on click if not part of a drag ending
+                  createDot(event);
+             }
+        });
+
+        body.addEventListener('mousedown', (event) => {
+            isDragging = true;
+            // Optionally create a dot immediately on mousedown if desired
+             // createDot(event);
+             // initAudio(); // Ensure audio context is ready
+        });
+
+        body.addEventListener('mousemove', (event) => {
+            if (isDragging) {
+                const now = Date.now();
+                if (now - lastDragTime > dragThrottleInterval) {
+                    createDot(event);
+                    lastDragTime = now;
+                }
+            }
+        });
+
+        body.addEventListener('mouseup', () => {
+            // Check if it was a drag (mouse moved significantly) vs a click
+            // A simple way is just setting the flag
+            isDragging = false;
+        });
+
+        // Prevent potential conflicts with drag selecting text
+        body.addEventListener('selectstart', (event) => {
+            event.preventDefault();
+        });
 
         // Start the animation loop
         requestAnimationFrame(animate);
