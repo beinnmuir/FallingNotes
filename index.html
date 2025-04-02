@@ -2,19 +2,38 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Falling Notes</title>
     <style>
         body {
             margin: 0;
-            overflow: hidden; /* Prevent scrollbars */
-            background-color: #f0f8ff; /* AliceBlue - a light pastel */
-            min-height: 100vh;
-            cursor: crosshair;
+            overflow: hidden;
+            background-color: #f0f0f0;
             font-family: sans-serif;
-            /* Remove flex layout for positioning zone labels */
-            color: #b0c4de; /* LightSteelBlue */
-            position: relative; /* Needed for absolute positioning of zones/labels */
+            display: flex;
+            flex-direction: column; /* Stack zones and button vertically */
+            height: 100vh;
+        }
+
+        #container {
+            position: relative;
+            width: 100%;
+            flex-grow: 1; /* Allow container to fill available space */
+            overflow: hidden; /* Keep dots contained */
+        }
+
+        .scale-zone {
+            position: absolute;
+            width: 100%;
+            border-bottom: 1px solid #ccc;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start; /* Align label to the left */
+            padding-left: 10px;
+            font-size: 12px;
+            color: #555;
+            background-color: rgba(255, 255, 255, 0.6);
+            pointer-events: none; /* Allow clicks to pass through */
         }
 
         .dot {
@@ -22,9 +41,21 @@
             width: 15px;
             height: 15px;
             border-radius: 50%;
-            pointer-events: none; /* Prevent dots from interfering with clicks */
-            box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.2);
-            z-index: 10; /* Ensure dots are above zone dividers/labels */
+            pointer-events: none;
+            box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        #controls {
+            padding: 10px;
+            background-color: #e0e0e0;
+            text-align: center;
+            box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+        }
+
+        #loop-toggle-button {
+            padding: 8px 15px;
+            font-size: 14px;
+            cursor: pointer;
         }
 
         /* Pastel color classes removed - color set dynamically */
@@ -61,13 +92,141 @@
             text-transform: capitalize;
         }
 
+        /* Container for loop controls */
+        #loop-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(230, 230, 230, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 8px; /* Spacing between elements */
+            z-index: 100; /* Ensure it's above dots/zones */
+        }
+
+        #loop-controls button {
+            padding: 5px 10px;
+            font-size: 12px;
+            cursor: pointer;
+            border: 1px solid #aaa;
+            border-radius: 3px;
+            background-color: #f0f0f0;
+            min-width: 80px; /* Ensure minimum width */
+            text-align: center;
+        }
+
+        #loop-controls button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        /* Style for the loop mode toggle and global actions */
+        #loop-global-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        /* Container for the dynamic list of loops */
+        #loop-list-container {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #ccc;
+            max-height: 300px; /* Limit height and allow scroll */
+            overflow-y: auto;
+        }
+
+        #loop-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .loop-item {
+            background-color: rgba(255, 255, 255, 0.7);
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .loop-item.selected {
+            border-color: #4682b4; /* SteelBlue border when selected */
+            background-color: rgba(220, 230, 240, 0.8);
+        }
+
+        .loop-item-header {
+            font-weight: bold;
+            font-size: 13px;
+            color: #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .loop-item-status {
+            font-size: 10px;
+            font-style: italic;
+            color: #666;
+        }
+
+        .loop-item-controls {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr); /* Two columns */
+            gap: 5px;
+        }
+
+        /* Smaller buttons for per-loop actions */
+        .loop-item-controls button {
+            padding: 3px 6px;
+            font-size: 11px;
+            min-width: 60px;
+        }
+
+        #loop-actions {
+            display: none;
+        }
+
+        /* Hide inner content, not the whole panel */
+        #loop-panel-content.hidden {
+            display: none !important; /* Ensure override on initial load */
+        }
     </style>
 </head>
 <body>
-    <!-- Zone dividers and labels will be added dynamically by JS -->
-    <div id="instructions">Click (or click and drag). Zone changes scale (color hue), L-R position changes pitch (color lightness).</div>
+    <div id="container">
+        <!-- Dots will be added here -->
+        <!-- Scale Zones will be added dynamically -->
+    </div>
+
+    <!-- Loop Controls Panel -->
+    <div id="loop-controls">
+        <button id="loop-mode-toggle">Enable Loop Mode</button>
+        <!-- Inner container that gets hidden/shown -->
+        <div id="loop-panel-content" class="hidden"> 
+            <div id="loop-global-actions">
+                <button id="play-button" disabled>Play All</button>
+                <button id="add-loop-layer-button">Add Loop Layer</button>
+                <button id="clear-all-loops-button" disabled>Clear All Loops</button>
+            </div>
+            <div id="loop-list-container">
+                <ul id="loop-list">
+                    <!-- Loop items will be generated here -->
+                </ul>
+            </div>
+        </div>
+    </div>
 
     <script>
+        const container = document.getElementById('container');
         const body = document.body;
         let audioContext;
         // pastelColors array removed
@@ -75,6 +234,26 @@
         let isDragging = false;
         let lastDragTime = 0;
         const dragThrottleInterval = 200; // Milliseconds between dot creation during drag
+
+        // --- Looping State (Multi-track) ---
+        let loopModeActive = false;
+        let isRecording = false;
+        let isPlaying = false;
+        let allLoops = []; // Array of loop arrays: [ [{note1}, {note2}], [{note3}] ]
+        let currentLoopIndex = -1; // Index of the loop currently being selected/recorded
+        let loopRecordStartTimes = {}; // { loopIndex: startTime }
+        let loopPlaybackTimeouts = []; // Stores timeout IDs for stopping loop cycles
+        let loopMutedStates = []; // Array of booleans, true if loop is muted
+        const loopControlsPanel = document.getElementById('loop-controls');
+        const loopModeToggleButton = document.getElementById('loop-mode-toggle');
+        const loopPanelContent = document.getElementById('loop-panel-content'); // New inner container
+        const loopListContainer = document.getElementById('loop-list-container');
+        const loopList = document.getElementById('loop-list');
+        // Global buttons
+        const recordButton = document.getElementById('record-button');
+        const playButton = document.getElementById('play-button');
+        const addLoopLayerButton = document.getElementById('add-loop-layer-button');
+        const clearAllLoopsButton = document.getElementById('clear-all-loops-button');
 
         // --- Musical Scales Definition ---
         const baseFrequency = 261.63; // C4
@@ -85,7 +264,7 @@
             blues:       { name: 'blues', intervals: [0, 3, 5, 6, 7, 10], colorHue: 270 }, // Purple
             natMinor:    { name: 'natural minor', intervals: [0, 2, 3, 5, 7, 8, 10], colorHue: 0 },   // Red
             harMinor:    { name: 'harmonic minor', intervals: [0, 2, 3, 5, 7, 8, 11], colorHue: 30 },  // Orange
-            chromatic:   { name: 'chromatic', intervals: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], colorHue: null } // Grey (handled specially)
+            chromatic:   { name: 'chromatic', intervals: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], colorHue: null } // Use greyscale
         };
         // Order can determine vertical position (top to bottom)
         const scaleOrder = ['major', 'majPent', 'blues', 'natMinor', 'harMinor', 'chromatic'];
@@ -93,7 +272,7 @@
         let zoneHeight = window.innerHeight / numZones;
 
         // --- Sound Setup ---
-        function initAudio() {
+        function initializeAudio() {
             if (!audioContext) {
                 try {
                     audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -110,7 +289,8 @@
         }
 
         // --- Play Note based on Scale and X-Position ---
-        function playNote(xPosition, scale) { // Y position is implicit in the chosen scale
+        // Modified to accept optional startTime for scheduled playback
+        function playNote(xPosition, scale, startTime = null) {
             if (!audioContext || !scale) return;
 
             // Normalize X across the entire screen width
@@ -135,21 +315,21 @@
             const gainNode = audioContext.createGain();
 
             oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+            oscillator.frequency.setValueAtTime(frequency, startTime || audioContext.currentTime);
 
-            gainNode.gain.setValueAtTime(0.4, audioContext.currentTime); // Slightly lower volume
-            gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.75);
+            gainNode.gain.setValueAtTime(0.4, startTime || audioContext.currentTime); // Slightly lower volume
+            gainNode.gain.exponentialRampToValueAtTime(0.001, (startTime || audioContext.currentTime) + 0.75);
 
             oscillator.connect(gainNode);
             gainNode.connect(audioContext.destination);
 
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 0.8);
+            oscillator.start(startTime || audioContext.currentTime);
+            oscillator.stop((startTime || audioContext.currentTime) + 0.8);
         }
 
         // --- Dot Creation ---
         function createDot(event) {
-            initAudio();
+            initializeAudio();
 
             const dot = document.createElement('div');
             dot.classList.add('dot');
@@ -184,13 +364,26 @@
             dot.style.backgroundColor = dotColor;
             // --- End Color Calculation ---
 
-            body.appendChild(dot);
+            // --- Record Note if Recording ---
+            if (isRecording && loopModeActive && currentLoopIndex >= 0 && allLoops[currentLoopIndex]) {
+                const recordStartTime = loopRecordStartTimes[currentLoopIndex];
+                if (recordStartTime !== undefined) {
+                    const timestamp = audioContext.currentTime - recordStartTime;
+                    allLoops[currentLoopIndex].push({ timestamp, xPosition: startX, scale: currentScale, dotColor });
+                } else {
+                    console.warn('No record start time found for current loop index:', currentLoopIndex);
+                }
+            }
 
+            // --- Animation ---
+            container.appendChild(dot);
+            const fallDuration = 2000; // milliseconds
+            const vy = 1.5 + Math.random() * 1.5;
             const dotInfo = {
                 element: dot,
                 x: startX,
                 y: startY,
-                vy: 1.5 + Math.random() * 1.5,
+                vy,
                 scale: currentScale // Store the scale for this dot
             };
             activeDots.push(dotInfo);
@@ -208,7 +401,7 @@
 
                 if (dotInfo.y + 7.5 >= bottomBoundary) {
                     playNote(dotInfo.x, dotInfo.scale); // Pass X pos and scale info
-                    body.removeChild(dotInfo.element);
+                    container.removeChild(dotInfo.element);
                     activeDots.splice(i, 1);
                 }
             }
@@ -216,7 +409,7 @@
         }
 
         // --- UI Setup (Dividers and Labels) ---
-        function setupZones() {
+        function setupScaleZones() {
             document.querySelectorAll('.zone-divider, .zone-label').forEach(el => el.remove());
 
             zoneHeight = window.innerHeight / numZones;
@@ -245,9 +438,9 @@
                 if (scaleHue !== null) {
                     label.style.color = `hsl(${scaleHue}, 60%, 35%)`; // Darker, less saturated version of the hue
                 }
-                 else {
-                     label.style.color = `hsl(0, 0%, 40%)`; // Dark grey for chromatic
-                 }
+                else {
+                    label.style.color = `hsl(0, 0%, 40%)`; // Dark grey for chromatic
+                }
 
                 body.appendChild(label);
             }
@@ -255,11 +448,17 @@
 
         // --- Event Listeners ---
         body.addEventListener('click', (event) => {
-             if (!isDragging) { createDot(event); }
+            // Ignore clicks inside the loop controls panel
+            if (event.target.closest('#loop-controls')) return;
+
+            if (!isDragging) { createDot(event); }
         });
         body.addEventListener('mousedown', (event) => {
+            // Ignore drag attempts starting inside the loop controls panel
+            if (event.target.closest('#loop-controls')) return;
+
             isDragging = true;
-            initAudio();
+            initializeAudio();
         });
         body.addEventListener('mousemove', (event) => {
             if (isDragging) {
@@ -278,12 +477,308 @@
         });
 
         // Handle window resize
-        window.addEventListener('resize', setupZones);
+        window.addEventListener('resize', setupScaleZones);
+
+        // --- Loop Control Event Listeners ---
+        // Listener for dynamically generated buttons within the loop list
+        if (loopList) { // Ensure loopList exists before adding listener
+            loopList.addEventListener('click', (event) => {
+                if (!loopModeActive) return;
+                const target = event.target;
+                const loopItem = target.closest('.loop-item');
+                if (!loopItem) return;
+
+                const index = parseInt(loopItem.dataset.loopIndex, 10);
+                if (isNaN(index) || index < 0 || index >= allLoops.length) return;
+
+                let handled = false;
+
+                if (target.classList.contains('loop-select-button')) {
+                    console.log(`Selecting loop ${index + 1}`);
+                    currentLoopIndex = index;
+                    if (isRecording) { // Stop recording if selecting a different loop
+                        stopRecording();
+                    }
+                    updateLoopUI();
+                    handled = true;
+                } else if (target.classList.contains('loop-record-button')) {
+                    if (index !== currentLoopIndex) {
+                        console.log("Select loop before recording.");
+                        return; // Must select first
+                    }
+                    toggleRecording(index);
+                    updateLoopUI();
+                    handled = true;
+                } else if (target.classList.contains('loop-mute-button')) {
+                    loopMutedStates[index] = !loopMutedStates[index];
+                    console.log(`Loop ${index + 1} muted: ${loopMutedStates[index]}`);
+                    updateLoopUI();
+                    handled = true;
+                } else if (target.classList.contains('loop-clear-button')) {
+                    console.log(`Clearing loop ${index + 1}`);
+                    if (isRecording && currentLoopIndex === index) {
+                        stopRecording(); // Stop if clearing the loop being recorded
+                    }
+                    allLoops[index] = []; // Clear the data
+                    if (currentLoopIndex === index) {
+                        // Optional: Keep it selected or deselect?
+                        // Let's keep it selected for now
+                    }
+                    if (allLoops.every(loop => loop.length === 0)) {
+                        stopAllLoops(); // Stop playback if all loops are now empty
+                    }
+                    updateLoopUI();
+                    handled = true;
+                }
+
+                if (handled) {
+                    event.stopPropagation(); // Prevent body listener from firing
+                }
+            });
+        } else {
+            console.error("#loop-list element not found!");
+        }
+
+        // Single button to toggle the entire loop panel visibility and active state
+        loopModeToggleButton.addEventListener('click', () => {
+            if (!audioContext) initializeAudio();
+            if (!audioContext) return; // Still couldn't get it
+
+            loopModeActive = !loopModeActive; // Toggle the active state
+            console.log(`Loop mode toggled. Active: ${loopModeActive}`);
+
+            if (!loopModeActive) {
+                // If disabling, ensure everything stops
+                stopAllLoops();
+                stopRecording();
+            } else {
+                // If enabling and no loops exist, add one automatically?
+                // if (allLoops.length === 0) {
+                //     addEmptyLoop();
+                // }
+            }
+
+            updateLoopUI(); // Update UI based on new state (will show/hide panel)
+        });
+
+        addLoopLayerButton.addEventListener('click', () => {
+            if (!loopModeActive) return;
+            if (isRecording) {
+                // Stop recording current loop before adding a new one
+                stopRecording();
+            }
+            addEmptyLoop();
+            updateLoopUI();
+        });
+
+        playButton.addEventListener('click', () => {
+            if (!loopModeActive) return;
+
+            if (isPlaying) {
+                console.log("Play Button Clicked: Stopping playback.");
+                // Stop playing
+                stopAllLoops(); // This sets isPlaying = false and calls updateLoopUI
+            } else if (allLoops.length > 0 && allLoops.some(loop => loop.length > 0)) {
+                console.log("Play Button Clicked: Starting playback.");
+                // Start Playing
+                isPlaying = true;           // Set state
+                updateLoopUI();             // Update button text immediately
+                console.log("Clearing previous timeouts before starting...");
+                loopPlaybackTimeouts.forEach(timeoutId => clearTimeout(timeoutId)); // Clear old timeouts before starting
+                loopPlaybackTimeouts = [];
+                console.log("Starting first loop cycle.");
+                runLoopCycle();             // Start the first cycle
+            } else {
+                console.log("Play Button Clicked: No loops with notes to play.");
+            }
+        });
+
+        clearAllLoopsButton.addEventListener('click', () => {
+            if (!loopModeActive || isRecording || isPlaying) return;
+            stopAllLoops(); // Just in case (should be disabled anyway)
+            stopRecording(); // Just in case
+            allLoops = [];
+            loopMutedStates = [];
+            currentLoopIndex = -1;
+            loopRecordStartTimes = {};
+            console.log('All loops cleared.');
+            updateLoopUI();
+        });
+
+        // --- Loop Functions ---
+        function addEmptyLoop() {
+            const newIndex = allLoops.length;
+            allLoops.push([]); // Add empty data array
+            loopMutedStates.push(false); // Add mute state (default: not muted)
+            currentLoopIndex = newIndex; // Select the new loop
+            console.log(`Added new loop layer. Now on loop ${currentLoopIndex + 1}.`);
+            // updateLoopUI() will be called after this function finishes
+        }
+
+        function finalizeLoop(index) {
+            if (index >= 0 && allLoops[index]) {
+                allLoops[index].sort((a, b) => a.timestamp - b.timestamp);
+                delete loopRecordStartTimes[index]; // Clear start time once recording stops
+            }
+        }
+
+        function stopRecording() { // Utility to ensure recording stops
+            if (isRecording) {
+                isRecording = false;
+                finalizeLoop(currentLoopIndex);
+                updateLoopUI();
+                console.log("Recording force stopped.")
+            }
+        }
+
+        function toggleRecording(index) {
+            if (index !== currentLoopIndex) return; // Should only toggle for selected loop
+
+            isRecording = !isRecording;
+            if (isRecording) {
+                // Start recording
+                loopRecordStartTimes[index] = audioContext.currentTime;
+                allLoops[index] = []; // Clear previous data for this loop index if re-recording
+                console.log(`Recording started for loop ${index + 1}...`);
+            } else {
+                // Stop recording
+                finalizeLoop(index);
+                console.log(`Recording stopped for loop ${index + 1}. ${allLoops[index]?.length || 0} notes.`);
+            }
+        }
+
+        function runLoopCycle() {
+            if (!loopModeActive || allLoops.length === 0) {
+                console.log("runLoopCycle: Stopping because loop mode inactive or no loops.");
+                stopAllLoops(); // Stop if mode disabled or loops cleared during playback
+                return;
+            }
+
+            // Check if playback was stopped externally since the timeout was scheduled
+            if (!isPlaying) {
+                console.log("runLoopCycle: Stopping because isPlaying is false.");
+                return; // Don't run the cycle if stopAllLoops was called
+            }
+
+            console.log(`Running loop cycle... (isPlaying: ${isPlaying})`);
+            const globalPlaybackStartTime = audioContext.currentTime;
+            let maxDuration = 0;
+
+            allLoops.forEach((loop, index) => {
+                if (loop.length === 0 || loopMutedStates[index]) {
+                    console.log(`Skipping loop ${index+1} (muted: ${loopMutedStates[index]}, length: ${loop.length})`);
+                    return; // Skip empty or muted loops
+                }
+
+                loop.forEach(note => {
+                    const playTime = globalPlaybackStartTime + note.timestamp;
+                    playNote(note.xPosition, note.scale, playTime);
+                });
+
+                // Find the timestamp of the last note in this loop to determine duration
+                const loopDuration = loop.length > 0 ? loop[loop.length - 1].timestamp : 0;
+                if (loopDuration > maxDuration) {
+                    maxDuration = loopDuration;
+                }
+            });
+
+            // Schedule the *next* cycle based on the longest loop
+            if (maxDuration > 0 && isPlaying) { // Add isPlaying check here before scheduling next
+                console.log(`Scheduling next loop cycle in ${maxDuration.toFixed(3)}s`);
+                const timeoutId = setTimeout(runLoopCycle, maxDuration * 1000);
+                loopPlaybackTimeouts.push(timeoutId);
+            } else if (isPlaying) { // Only log/stop if we were intending to play
+                console.log("Loop cycle ended, but no notes found/played to determine duration. Stopping.");
+                stopAllLoops(); // Stop if maxDuration is 0 or only muted loops exist
+            } else {
+                console.log("runLoopCycle: Playback stopped during cycle execution.")
+            }
+        }
+
+        function stopAllLoops() {
+            console.log('stopAllLoops called.');
+            const wasPlaying = isPlaying; // Check if it was actually playing
+            isPlaying = false; // Set state *before* UI update
+            console.log(`Clearing ${loopPlaybackTimeouts.length} upcoming loop cycle timeouts.`);
+            loopPlaybackTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+            loopPlaybackTimeouts = [];
+            console.log('Cleared upcoming loop cycles.');
+            // Update UI if the mode is active OR if it was playing (to reset button text)
+            if(loopModeActive || wasPlaying) {
+                console.log('Updating UI after stopping.');
+                updateLoopUI(); // Update UI AFTER state change
+            }
+        }
+
+        // --- UI Update Function ---
+        function updateLoopUI() {
+            if (!loopControlsPanel) return; // Ensure elements exist
+
+            console.log(`updateLoopUI called. loopModeActive: ${loopModeActive}`);
+
+            if (loopModeActive) {
+                console.log('updateLoopUI: Removing hidden class from panel content.');
+                loopPanelContent.classList.remove('hidden'); // Show inner content
+                loopModeToggleButton.textContent = 'Hide Loop Controls'; // Text when panel is visible
+
+                const hasAnyLoops = allLoops.length > 0;
+                const hasNotesInAnyLoop = hasAnyLoops && allLoops.some(loop => loop.length > 0);
+
+                // Update Global Buttons
+                playButton.disabled = !hasNotesInAnyLoop || isRecording;
+                playButton.textContent = isPlaying ? 'Stop All' : 'Play All';
+
+                addLoopLayerButton.disabled = isRecording;
+
+                clearAllLoopsButton.disabled = !hasAnyLoops || isRecording || isPlaying;
+
+                // Update Loop List
+                loopList.innerHTML = ''; // Clear previous list items
+                allLoops.forEach((loop, index) => {
+                    const li = document.createElement('li');
+                    li.classList.add('loop-item');
+                    li.dataset.loopIndex = index;
+                    if (index === currentLoopIndex) {
+                        li.classList.add('selected');
+                    }
+
+                    const isMuted = loopMutedStates[index];
+                    const loopHasData = loop.length > 0;
+                    const isCurrentlyRecordingThis = isRecording && currentLoopIndex === index;
+
+                    li.innerHTML = `
+                        <div class="loop-item-header">
+                            <span>Loop ${index + 1}</span>
+                            <span class="loop-item-status">
+                                ${isCurrentlyRecordingThis ? 'RECORDING' : (loopHasData ? `${loop.length} notes` : '(empty)')}
+                                ${isMuted ? ' [MUTED]' : ''}
+                            </span>
+                        </div>
+                        <div class="loop-item-controls">
+                            <button class="loop-select-button" ${index === currentLoopIndex ? 'disabled' : ''}>Select</button>
+                            <button class="loop-record-button" ${index !== currentLoopIndex ? 'disabled' : ''}>${isCurrentlyRecordingThis ? 'Stop Rec' : 'Record'}</button>
+                            <button class="loop-mute-button" ${!loopHasData ? 'disabled' : ''}>${isMuted ? 'Unmute' : 'Mute'}</button>
+                            <button class="loop-clear-button" ${!loopHasData ? 'disabled' : ''}>Clear</button>
+                        </div>
+                    `;
+                    loopList.appendChild(li);
+                });
+            } else {
+                console.log('updateLoopUI: Adding hidden class to panel content.');
+                loopPanelContent.classList.add('hidden'); // Hide inner content
+                loopModeToggleButton.textContent = 'Enable Loop Mode';
+                // Ensure playback/recording stops if mode is disabled
+                if (isPlaying) stopAllLoops();
+                if (isRecording) stopRecording(); // stopRecording handles logging
+            }
+        }
 
         // Initial Setup
-        setupZones();
+        initializeAudio();
+        setupScaleZones();
+        console.log(`Initial check before first updateLoopUI: loopModeActive = ${loopModeActive}`);
+        updateLoopUI(); // Initial UI state
         requestAnimationFrame(animate);
-
     </script>
 </body>
 </html>
