@@ -88,10 +88,11 @@
             natMinor:    { name: 'natural minor', intervals: [0, 2, 3, 5, 7, 8, 10] },
             harMinor:    { name: 'harmonic minor', intervals: [0, 2, 3, 5, 7, 8, 11] },
             majPent:     { name: 'major pentatonic', intervals: [0, 2, 4, 7, 9] },
+            blues:       { name: 'blues', intervals: [0, 3, 5, 6, 7, 10] },
             chromatic:   { name: 'chromatic', intervals: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] } // Atonal-like
         };
         // Order can determine vertical position (top to bottom)
-        const scaleOrder = ['major', 'majPent', 'natMinor', 'harMinor', 'chromatic'];
+        const scaleOrder = ['major', 'majPent', 'blues', 'natMinor', 'harMinor', 'chromatic'];
         const numZones = scaleOrder.length;
         let zoneHeight = window.innerHeight / numZones;
 
