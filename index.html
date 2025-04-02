@@ -12,10 +12,9 @@
             min-height: 100vh;
             cursor: crosshair;
             font-family: sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: flex-end; /* Align text to bottom */
+            /* Remove flex layout for positioning zone labels */
             color: #b0c4de; /* LightSteelBlue */
+            position: relative; /* Needed for absolute positioning of zones/labels */
         }
 
         .dot {
@@ -25,6 +24,7 @@
             border-radius: 50%;
             pointer-events: none; /* Prevent dots from interfering with clicks */
             box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.2);
+            z-index: 10; /* Ensure dots are above zone dividers/labels */
         }
 
         /* Define some pastel colors */
@@ -41,13 +41,36 @@
             width: 100%;
             font-size: 0.9em;
             color: #a9a9a9; /* DarkGray */
-            z-index: -1; /* Place behind dots */
-         }
+            z-index: 1; /* Behind dots but above background */
+        }
+
+        /* Zone Styling */
+        .zone-divider {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background-color: rgba(176, 196, 222, 0.5); /* LightSteelBlue, semi-transparent */
+            z-index: 0; /* Behind everything else */
+        }
+
+        .zone-label {
+            position: absolute;
+            top: 10px;
+            text-align: center;
+            width: auto; /* Let content determine width */
+            font-size: 0.8em;
+            color: #b0c4de; /* LightSteelBlue */
+            z-index: 1;
+            pointer-events: none; /* Don't interfere with clicks */
+            text-transform: capitalize;
+        }
 
     </style>
 </head>
 <body>
-    <div id="instructions">Click (or click and drag) anywhere to create falling notes.</div>
+    <!-- Zone dividers and labels will be added dynamically by JS -->
+    <div id="instructions">Click (or click and drag) in different zones to create falling notes in various scales.</div>
 
     <script>
         const body = document.body;
@@ -58,11 +81,23 @@
         let lastDragTime = 0;
         const dragThrottleInterval = 50; // Milliseconds between dot creation during drag
 
+        // --- Musical Scales Definition ---
+        const baseFrequency = 261.63; // C4
+        const scales = {
+            major:       { name: 'major', intervals: [0, 2, 4, 5, 7, 9, 11] },
+            natMinor:    { name: 'natural minor', intervals: [0, 2, 3, 5, 7, 8, 10] },
+            harMinor:    { name: 'harmonic minor', intervals: [0, 2, 3, 5, 7, 8, 11] },
+            majPent:     { name: 'major pentatonic', intervals: [0, 2, 4, 7, 9] },
+            chromatic:   { name: 'chromatic', intervals: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] } // Atonal-like
+        };
+        const scaleOrder = ['major', 'natMinor', 'harMinor', 'majPent', 'chromatic'];
+        const numZones = scaleOrder.length;
+        let zoneWidth = window.innerWidth / numZones;
+
         // --- Sound Setup ---
         function initAudio() {
             if (!audioContext) {
                 try {
-                    // Standard context
                     audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 } catch (e) {
                     console.error("Web Audio API is not supported in this browser", e);
@@ -71,57 +106,73 @@
             }
         }
 
-        function playNote(xPosition) {
-            if (!audioContext) return; // Don't play if context failed
+        // --- Calculate Frequency from Scale Note ---
+        function getFrequency(semitonesFromBase) {
+            // Frequency = Base * 2^(Semitones / 12)
+            return baseFrequency * Math.pow(2, semitonesFromBase / 12);
+        }
+
+        // --- Play Note based on Scale and Position within Zone ---
+        function playNote(xPosition, scale) {
+            if (!audioContext || !scale) return;
+
+            const zoneIndex = Math.floor(xPosition / zoneWidth);
+            const relativeX = (xPosition % zoneWidth) / zoneWidth; // Normalize X within zone (0 to 1)
+
+            const intervals = scale.intervals;
+            // Map relativeX to an index in the scale's intervals array
+            const noteIndexInScale = Math.floor(relativeX * intervals.length);
+            const semitones = intervals[noteIndexInScale];
+
+            // Optional: Add octave based on zone? Or keep simple for now.
+            const octaveShift = 0; // Can modify later
+            const totalSemitones = semitones + (octaveShift * 12);
+
+            const frequency = getFrequency(totalSemitones);
 
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
 
-            // Map xPosition (0 to window.innerWidth) to frequency (e.g., C4 to C6)
-            const minFreq = 261.63; // C4
-            const maxFreq = 1046.50; // C6
-            // Linear mapping: const frequency = minFreq + (xPosition / window.innerWidth) * (maxFreq - minFreq);
-             // Exponential (more musical) mapping over 2 octaves:
-            const frequency = minFreq * Math.pow(2, (xPosition / window.innerWidth) * 2);
-
-
-            oscillator.type = 'sine'; // Smooth, pleasant sound
+            oscillator.type = 'sine';
             oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
 
-            // Envelope (attack, decay, sustain, release) - simple fade out
-            gainNode.gain.setValueAtTime(0.5, audioContext.currentTime); // Start at half volume
-            gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.75); // Fade out over 0.75s
+            gainNode.gain.setValueAtTime(0.4, audioContext.currentTime); // Slightly lower volume
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.75);
 
             oscillator.connect(gainNode);
             gainNode.connect(audioContext.destination);
 
             oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 0.8); // Stop after fade out
+            oscillator.stop(audioContext.currentTime + 0.8);
         }
 
         // --- Dot Creation ---
         function createDot(event) {
-            initAudio(); // Ensure audio context is ready on first interaction
+            initAudio();
 
             const dot = document.createElement('div');
             dot.classList.add('dot');
-
-            // Assign a random pastel color
             const randomColorClass = pastelColors[Math.floor(Math.random() * pastelColors.length)];
             dot.classList.add(randomColorClass);
 
             const startX = event.clientX;
             const startY = event.clientY;
-            dot.style.left = `${startX - 7}px`; // Center the dot on cursor
+            dot.style.left = `${startX - 7}px`;
             dot.style.top = `${startY - 7}px`;
 
             body.appendChild(dot);
+
+            // Determine scale based on zone
+            const zoneIndex = Math.min(Math.floor(startX / zoneWidth), numZones - 1); // Ensure index is valid
+            const scaleKey = scaleOrder[zoneIndex];
+            const currentScale = scales[scaleKey];
 
             const dotInfo = {
                 element: dot,
                 x: startX,
                 y: startY,
-                vy: 1.5 + Math.random() * 1.5 // Initial velocity + small random variation
+                vy: 1.5 + Math.random() * 1.5,
+                scale: currentScale // Store the scale for this dot
             };
             activeDots.push(dotInfo);
         }
@@ -132,40 +183,57 @@
 
             for (let i = activeDots.length - 1; i >= 0; i--) {
                 const dotInfo = activeDots[i];
-
-                // Apply gravity (increase velocity)
                 dotInfo.vy += 0.1;
-                // Update position
                 dotInfo.y += dotInfo.vy;
-
                 dotInfo.element.style.top = `${dotInfo.y - 7}px`;
 
-                // Check for collision with bottom
-                if (dotInfo.y + 7.5 >= bottomBoundary) { // +7.5 for half dot height
-                    playNote(dotInfo.x); // Play sound based on original x position
-                    body.removeChild(dotInfo.element); // Remove dot element
-                    activeDots.splice(i, 1); // Remove dot from active list
+                if (dotInfo.y + 7.5 >= bottomBoundary) {
+                    playNote(dotInfo.x, dotInfo.scale); // Pass scale info to playNote
+                    body.removeChild(dotInfo.element);
+                    activeDots.splice(i, 1);
                 }
             }
+            requestAnimationFrame(animate);
+        }
 
-            requestAnimationFrame(animate); // Continue the loop
+        // --- UI Setup (Dividers and Labels) ---
+        function setupZones() {
+            // Clear existing dividers/labels if any (e.g., on resize)
+            document.querySelectorAll('.zone-divider, .zone-label').forEach(el => el.remove());
+
+            zoneWidth = window.innerWidth / numZones;
+
+            for (let i = 1; i < numZones; i++) {
+                // Add Dividers
+                const divider = document.createElement('div');
+                divider.classList.add('zone-divider');
+                divider.style.left = `${i * zoneWidth}px`;
+                body.appendChild(divider);
+            }
+
+            for (let i = 0; i < numZones; i++) {
+                // Add Labels
+                const label = document.createElement('div');
+                label.classList.add('zone-label');
+                label.textContent = scales[scaleOrder[i]].name;
+                // Center label within its zone
+                const labelX = (i * zoneWidth) + (zoneWidth / 2);
+                label.style.left = `${labelX}px`;
+                // Adjust for label width to truly center it
+                label.style.transform = 'translateX(-50%)';
+                body.appendChild(label);
+            }
         }
 
         // --- Event Listeners ---
         body.addEventListener('click', (event) => {
-             // Keep click for single, non-drag interactions
-             if (!isDragging) { // Only create on click if not part of a drag ending
-                  createDot(event);
-             }
+             if (!isDragging) { createDot(event); }
         });
-
         body.addEventListener('mousedown', (event) => {
             isDragging = true;
-            // Optionally create a dot immediately on mousedown if desired
-             // createDot(event);
-             // initAudio(); // Ensure audio context is ready
+            // No immediate dot on mousedown for cleaner drag start
+            initAudio(); // Ensure audio starts on interaction
         });
-
         body.addEventListener('mousemove', (event) => {
             if (isDragging) {
                 const now = Date.now();
@@ -175,20 +243,19 @@
                 }
             }
         });
-
         body.addEventListener('mouseup', () => {
-            // Check if it was a drag (mouse moved significantly) vs a click
-            // A simple way is just setting the flag
             isDragging = false;
         });
-
-        // Prevent potential conflicts with drag selecting text
         body.addEventListener('selectstart', (event) => {
             event.preventDefault();
         });
 
-        // Start the animation loop
-        requestAnimationFrame(animate);
+        // Handle window resize
+        window.addEventListener('resize', setupZones);
+
+        // Initial Setup
+        setupZones(); // Draw zones initially
+        requestAnimationFrame(animate); // Start the animation loop
 
     </script>
 </body>
