@@ -547,15 +547,21 @@
             loopModeActive = !loopModeActive; // Toggle the active state
             console.log(`Loop mode toggled. Active: ${loopModeActive}`);
 
-            if (!loopModeActive) {
-                // If disabling, ensure everything stops
-                stopAllLoops();
-                stopRecording();
+            if (loopModeActive) {
+                // Add the first loop layer automatically if none exist
+                if (allLoops.length === 0) {
+                    console.log("Loop mode enabled, adding initial loop layer.");
+                    addEmptyLoop();
+                }
             } else {
-                // If enabling and no loops exist, add one automatically?
-                // if (allLoops.length === 0) {
-                //     addEmptyLoop();
-                // }
+                // Disabling loop mode - stop everything related to looping
+                if (isPlaying) {
+                    console.log("Disabling loop mode, stopping playback.");
+                    stopAllLoops();
+                }
+                if (isRecording) {
+                    stopRecording(); // stopRecording handles logging
+                }
             }
 
             updateLoopUI(); // Update UI based on new state (will show/hide panel)
