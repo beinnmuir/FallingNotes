@@ -344,8 +344,6 @@
 
         // --- Dot Creation ---
         function createDot(event) {
-            initializeAudio();
-
             const dot = document.createElement('div');
             dot.classList.add('dot');
             // Random color assignment removed
@@ -470,6 +468,9 @@
             if (!isDragging) { createDot(event); }
         });
         container.addEventListener('mousedown', (e) => {
+            // Ensure audio is ready on first click
+            initializeAudio(); 
+            
             isDragging = true;
             createDot(e); // Create dot on initial click
             lastDragTime = Date.now();
@@ -493,13 +494,45 @@
             isDragging = false;
         });
 
-        // Add touchstart listener specifically to resume audio context on mobile
+        // Add touchstart listener for mobile interaction
         container.addEventListener('touchstart', (e) => {
-            initializeAudio();
-            // We might prevent default if we only want taps here to start audio,
-            // but let's allow normal touch behaviour for now.
+            // Ensure audio is ready on first touch
+            initializeAudio(); 
+
+            // Prevent touch from ALSO triggering mousedown/click events immediately
+            e.preventDefault(); 
+
+            isDragging = true;
+            // Get touch coordinates
+            const touch = e.touches[0]; 
+            const mockEvent = { clientX: touch.clientX, clientY: touch.clientY };
+            createDot(mockEvent); 
+            lastDragTime = Date.now();
+        }, { passive: false }); // Need passive: false to allow preventDefault
+
+        container.addEventListener('touchmove', (e) => {
+            if (isDragging) {
+                // Prevent scrolling while dragging to create notes
+                e.preventDefault(); 
+
+                const now = Date.now();
+                if (now - lastDragTime > dragThrottleInterval) {
+                    const touch = e.touches[0];
+                    const mockEvent = { clientX: touch.clientX, clientY: touch.clientY };
+                    createDot(mockEvent);
+                    lastDragTime = now;
+                }
+            }
+        }, { passive: false }); // Need passive: false to allow preventDefault
+
+        container.addEventListener('touchend', (e) => {
+            // Check if touches list is empty (last finger lifted)
+             if (e.touches.length === 0) {
+                isDragging = false;
+            }
+            // Optional: Prevent default actions if needed
             // e.preventDefault(); 
-        }, { once: true }); // Only need to run this once to unlock audio
+        });
 
         window.addEventListener('resize', () => {
             setupScaleZones();
@@ -949,7 +982,6 @@
         }
 
         // Initial Setup
-        initializeAudio();
         setupScaleZones();
         console.log(`Initial check before first updateLoopUI: loopModeActive = ${loopModeActive}`);
         updateLoopUI(); // Initial UI state
