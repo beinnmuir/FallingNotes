@@ -203,9 +203,42 @@
         #loop-panel-content.hidden {
             display: none !important; /* Ensure override on initial load */
         }
+
+        /* Button specific styles */
+        #enable-sound-button {
+            display: none; /* Hidden by default */
+            padding: 5px 10px;
+            margin-top: 10px;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+            cursor: pointer;
+            background-color: #f0f0f0;
+            color: #333;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        #enable-sound-button:hover {
+            background-color: #e0e0e0;
+        }
+        #enable-sound-button.show {
+            display: inline-block; /* Show when needed */
+        }
+
+        /* Container for the sound button */
+        #sound-enable-container {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+        }
     </style>
 </head>
 <body>
+    <!-- Container for the enable sound button -->
+    <div id="sound-enable-container">
+        <button id="enable-sound-button">Turn on Sound</button>
+    </div>
     <div id="container">
         <!-- Dots will be added here -->
         <!-- Scale Zones will be added dynamically -->
@@ -229,16 +262,16 @@
             </div>
         </div>
     </div>
-
     <script>
         const container = document.getElementById('container');
         const body = document.body;
         let audioContext;
-        // pastelColors array removed
         const activeDots = []; // Keep track of dots for animation
         let isDragging = false;
         let lastDragTime = 0;
-        const dragThrottleInterval = 200; // Milliseconds between dot creation during drag
+        let mouseDown = false; // New flag for mouse button state
+        let mouseDownTime = 0; // Track time of mousedown
+        const dragInterval = 250; // Milliseconds between dots when dragging
 
         // --- Looping State (Multi-track) ---
         let loopModeActive = false;
@@ -262,6 +295,7 @@
         const addLoopLayerButton = document.getElementById('add-loop-layer-button');
         const clearAllLoopsButton = document.getElementById('clear-all-loops-button');
         const loopSyncToggleButton = document.getElementById('loop-sync-toggle');
+        const enableSoundButton = document.getElementById('enable-sound-button'); // Get button ref
 
         // --- Musical Scales Definition ---
         const baseFrequency = 65.4075; // C2
@@ -280,34 +314,12 @@
         let zoneHeight = window.innerHeight / numZones;
 
         // --- Sound Setup ---
-        function initializeAudio() { 
-            console.log('initializeAudio called');
-            if (!audioContext) {
-                try {
-                    console.log('Creating new AudioContext');
-                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    console.log('Initial AudioContext state:', audioContext.state);
-                    // Check if context is suspended and resume it (needed for mobile)
-                    if (audioContext.state === 'suspended') {
-                        console.log('Attempting to resume new suspended context...');
-                        // Let resume run async in background
-                        audioContext.resume().then(() => {
-                            console.log('Context resumed successfully (async).', audioContext.state);
-                        }).catch(err => console.error('Error resuming new context (async):', err));
-                    }
-                } catch (e) {
-                    console.error("Web Audio API is not supported in this browser", e);
-                    alert("Sorry, your browser doesn't support the Web Audio API needed for sound.");
-                }
-            } else if (audioContext.state === 'suspended') {
-                console.log('Context exists but is suspended. Attempting to resume...');
-                 // Let resume run async in background
-                 audioContext.resume().then(() => {
-                    console.log('Existing context resumed successfully (async).', audioContext.state);
-                }).catch(err => console.error('Error resuming existing context (async):', err));
-            } else {
-                console.log('AudioContext already exists and is running.', audioContext.state);
-            }
+        try {
+            // Create context immediately on script load
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (e) {
+            console.error("Web Audio API is not supported in this browser", e);
+            alert("Sorry, your browser doesn't support the Web Audio API needed for sound.");
         }
 
         // --- Calculate Frequency from Scale Note ---
@@ -318,14 +330,12 @@
         // --- Play Note based on Scale and X-Position ---
         // Modified to accept optional startTime for scheduled playback
         function playNote(xPosition, scale, startTime = null) {
-            console.log(`playNote called: x=${xPosition}, scale=${scale?.name}, startTime=${startTime}`);
             // CRITICAL CHECK: Ensure context is running before proceeding
             if (!audioContext || audioContext.state !== 'running') {
-                console.warn(`playNote aborted: AudioContext not ready or not running. State: ${audioContext?.state}`);
+                // Silently return if context not ready - expected on first mobile interaction
                 return;
             }
             if (!scale) {
-                console.warn('playNote aborted: No scale provided.');
                 return;
             }
 
@@ -347,8 +357,6 @@
 
             const frequency = getFrequency(totalSemitones);
 
-            console.log(`Attempting to play frequency: ${frequency}`);
-
             try {
                 const oscillator = audioContext.createOscillator();
                 const gainNode = audioContext.createGain(); // Re-enabled GainNode
@@ -363,12 +371,9 @@
                 oscillator.connect(gainNode);
                 gainNode.connect(audioContext.destination);
 
-                console.log('Oscillator connected via GainNode to destination');
-
                 oscillator.start(startTime || audioContext.currentTime);
                 // Restore original stop time
                 oscillator.stop((startTime || audioContext.currentTime) + 1.0); // Extend to 1 second
-                console.log('Oscillator started and scheduled to stop');
             } catch (err) {
                 console.error('Error during oscillator creation/playback:', err);
             }
@@ -446,7 +451,10 @@
                 dotInfo.element.style.top = `${dotInfo.y - 7}px`;
 
                 if (dotInfo.y + 7.5 >= bottomBoundary) {
-                    playNote(dotInfo.x, dotInfo.scale); // Pass X pos and scale info
+                    // Ensure audio context is ready before playing
+                    if (audioContext && audioContext.state === 'running') {
+                        playNote(dotInfo.x, dotInfo.scale);
+                    }
                     container.removeChild(dotInfo.element);
                     activeDots.splice(i, 1);
                 }
@@ -493,69 +501,74 @@
         }
 
         // --- Event Listeners ---
-        body.addEventListener('click', (event) => {
-            // Ignore clicks inside the loop controls panel
-            if (event.target.closest('#loop-controls')) return;
-
-            if (!isDragging) { createDot(event); }
-        });
-        // Add mousedown listener for desktop interaction
-        container.addEventListener('mousedown', (e) => {
-            console.log('mousedown event fired');
-            // Ensure audio context is initialized/resumed (runs async)
-            initializeAudio();
-            
-            isDragging = true;
+        const handleMouseDown = (e) => {
+            e.preventDefault(); // Prevent default browser actions like text selection
+            mouseDown = true; // Set flag that mouse is down
+            isDragging = false; // Ensure dragging flag is false initially
             createDot(e); // Create dot on initial click
-            lastDragTime = Date.now();
-        });
+            mouseDownTime = Date.now(); // Record time of mousedown
+        };
+
+        container.removeEventListener('mousedown', handleMouseDown); // Remove first
+        container.addEventListener('mousedown', handleMouseDown); // Then add
 
         container.addEventListener('mousemove', (e) => {
-            if (isDragging) {
-                const now = Date.now();
-                if (now - lastDragTime > dragThrottleInterval) {
-                    createDot(e);
-                    lastDragTime = now;
+            if (!mouseDown) return; // Only process if mouse button is down
+
+            if (isDragging) { // If already dragging, continue based on interval
+                if (Date.now() - lastDragTime > dragInterval) {
+                    createDot(e); // Create dot while dragging
+                    lastDragTime = Date.now(); // Update last drag time
+                }
+            } else { // If mouse is down but not yet dragging
+                // Check if enough time passed since mousedown to start dragging
+                if (Date.now() - mouseDownTime > dragInterval) {
+                    isDragging = true; // Start dragging
+                    createDot(e); // Create the first drag dot
+                    lastDragTime = Date.now(); // Set initial drag time
                 }
             }
         });
 
-        container.addEventListener('mouseup', () => {
-            isDragging = false;
+        container.addEventListener('mouseup', (e) => {
+            mouseDown = false; // Reset mouse down flag
+            isDragging = false; // Stop dragging
         });
-
-        container.addEventListener('mouseleave', () => {
-            isDragging = false;
+        container.addEventListener('mouseleave', (e) => {
+            mouseDown = false; // Reset mouse down flag if pointer leaves
+            isDragging = false; // Also stop dragging if mouse leaves container
         });
 
         // Add touchstart listener for mobile interaction
         container.addEventListener('touchstart', (e) => {
-            console.log('touchstart event fired'); 
             // Prevent touch from ALSO triggering mousedown/click events immediately
             e.preventDefault(); 
  
-            // Ensure audio context is initialized/resumed (runs async)
-            initializeAudio(); 
- 
-            isDragging = true;
+            mouseDown = true; // Use same flag for touch
+            isDragging = false;
             // Get touch coordinates
             const touch = e.touches[0]; 
-            const mockEvent = { clientX: touch.clientX, clientY: touch.clientY };
-            createDot(mockEvent); 
-            lastDragTime = Date.now();
+            createDot(touch); // Create dot on initial touch
+            mouseDownTime = Date.now(); // Record time of touchstart
         }, { passive: false }); // Need passive: false to allow preventDefault
 
         container.addEventListener('touchmove', (e) => {
-            if (isDragging) {
-                // Prevent scrolling while dragging to create notes
-                e.preventDefault(); 
+            e.preventDefault(); // Prevent scrolling while drawing
+            if (!mouseDown) return; // Only process if touch is active
 
-                const now = Date.now();
-                if (now - lastDragTime > dragThrottleInterval) {
+            if (isDragging) { // If already dragging
+                if (Date.now() - lastDragTime > dragInterval) {
                     const touch = e.touches[0];
-                    const mockEvent = { clientX: touch.clientX, clientY: touch.clientY };
-                    createDot(mockEvent);
-                    lastDragTime = now;
+                    createDot(touch);
+                    lastDragTime = Date.now();
+                }
+            } else { // If touch started but not yet dragging
+                // Check if enough time passed since touchstart to start dragging
+                if (Date.now() - mouseDownTime > dragInterval) {
+                    isDragging = true; // Start dragging
+                    const touch = e.touches[0];
+                    createDot(touch); // Create first drag dot
+                    lastDragTime = Date.now(); // Set initial drag time
                 }
             }
         }, { passive: false }); // Need passive: false to allow preventDefault
@@ -563,10 +576,15 @@
         container.addEventListener('touchend', (e) => {
             // Check if touches list is empty (last finger lifted)
              if (e.touches.length === 0) {
+                mouseDown = false; // Reset flag
                 isDragging = false;
             }
             // Optional: Prevent default actions if needed
             // e.preventDefault(); 
+        });
+        container.addEventListener('touchcancel', (e) => {
+            mouseDown = false; // Reset flag
+            isDragging = false;
         });
 
         window.addEventListener('resize', () => {
@@ -643,9 +661,6 @@
 
         // Single button to toggle the entire loop panel visibility and active state
         loopModeToggleButton.addEventListener('click', () => {
-            if (!audioContext) initializeAudio();
-            if (!audioContext) return; // Still couldn't get it
-
             loopModeActive = !loopModeActive; // Toggle the active state
             console.log(`Loop mode toggled. Active: ${loopModeActive}`);
 
@@ -1021,6 +1036,47 @@
         console.log(`Initial check before first updateLoopUI: loopModeActive = ${loopModeActive}`);
         updateLoopUI(); // Initial UI state
         requestAnimationFrame(animate);
+
+        // --- Enable Sound Button Logic ---
+        if (audioContext && audioContext.state === 'suspended') {
+            console.log('AudioContext suspended, showing enable sound button.');
+            enableSoundButton.classList.add('show');
+
+            enableSoundButton.addEventListener('click', async (event) => {
+                event.stopPropagation(); // Prevent click from bubbling to container
+                console.log('Enable Sound button clicked.');
+                if (audioContext && audioContext.state === 'suspended') {
+                    try {
+                        console.log('Attempting to resume AudioContext...');
+                        await audioContext.resume();
+                        console.log('AudioContext resumed successfully.', audioContext.state);
+                        enableSoundButton.classList.remove('show'); // Hide button on success
+                        enableSoundButton.style.display = 'none'; // Ensure it's hidden
+                    } catch (err) {
+                        console.error('Error resuming AudioContext:', err);
+                        alert('Could not enable sound. Please try reloading.');
+                    }
+                } else {
+                    // Should not happen if button is only shown when suspended, but good practice
+                    console.log('AudioContext already running or not available.');
+                    enableSoundButton.classList.remove('show');
+                    enableSoundButton.style.display = 'none'; 
+                }
+            });
+        } else if (audioContext) {
+            console.log('AudioContext started in running state or is not supported.');
+        } else {
+             console.log('AudioContext not created (likely unsupported browser).');
+        }
+
+        // Prevent clicks/taps on the sound enable button container from creating dots
+        const soundEnableContainer = document.getElementById('sound-enable-container'); // Get container ref
+        soundEnableContainer.addEventListener('mousedown', (event) => {
+            event.stopPropagation();
+        });
+        soundEnableContainer.addEventListener('touchstart', (event) => {
+            event.stopPropagation();
+        });
     </script>
 </body>
 </html>
