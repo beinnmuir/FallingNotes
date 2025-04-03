@@ -284,10 +284,17 @@
             if (!audioContext) {
                 try {
                     audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    // Check if context is suspended and resume it (needed for mobile)
+                    if (audioContext.state === 'suspended') {
+                        audioContext.resume();
+                    }
                 } catch (e) {
                     console.error("Web Audio API is not supported in this browser", e);
                     alert("Sorry, your browser doesn't support the Web Audio API needed for sound.");
                 }
+            } else if (audioContext.state === 'suspended') {
+                // If context exists but is suspended, resume it
+                audioContext.resume().catch(err => console.error('Error resuming audio context:', err));
             }
         }
 
@@ -462,31 +469,41 @@
 
             if (!isDragging) { createDot(event); }
         });
-        body.addEventListener('mousedown', (event) => {
-            // Ignore drag attempts starting inside the loop controls panel
-            if (event.target.closest('#loop-controls')) return;
-
+        container.addEventListener('mousedown', (e) => {
             isDragging = true;
-            initializeAudio();
+            createDot(e); // Create dot on initial click
+            lastDragTime = Date.now();
         });
-        body.addEventListener('mousemove', (event) => {
+
+        container.addEventListener('mousemove', (e) => {
             if (isDragging) {
                 const now = Date.now();
                 if (now - lastDragTime > dragThrottleInterval) {
-                    createDot(event);
+                    createDot(e);
                     lastDragTime = now;
                 }
             }
         });
-        body.addEventListener('mouseup', () => {
+
+        container.addEventListener('mouseup', () => {
             isDragging = false;
         });
-        body.addEventListener('selectstart', (event) => {
-            event.preventDefault();
+
+        container.addEventListener('mouseleave', () => {
+            isDragging = false;
         });
 
-        // Handle window resize
-        window.addEventListener('resize', setupScaleZones);
+        // Add touchstart listener specifically to resume audio context on mobile
+        container.addEventListener('touchstart', (e) => {
+            initializeAudio();
+            // We might prevent default if we only want taps here to start audio,
+            // but let's allow normal touch behaviour for now.
+            // e.preventDefault(); 
+        }, { once: true }); // Only need to run this once to unlock audio
+
+        window.addEventListener('resize', () => {
+            setupScaleZones();
+        });
 
         // --- Loop Control Event Listeners ---
         // Listener for dynamically generated buttons within the loop list
