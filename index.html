@@ -281,20 +281,30 @@
 
         // --- Sound Setup ---
         function initializeAudio() {
+            console.log('initializeAudio called');
             if (!audioContext) {
                 try {
+                    console.log('Creating new AudioContext');
                     audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    console.log('Initial AudioContext state:', audioContext.state);
                     // Check if context is suspended and resume it (needed for mobile)
                     if (audioContext.state === 'suspended') {
-                        audioContext.resume();
+                        console.log('Attempting to resume new suspended context...');
+                        audioContext.resume().then(() => {
+                            console.log('Context resumed successfully.', audioContext.state);
+                        }).catch(err => console.error('Error resuming new context:', err));
                     }
                 } catch (e) {
                     console.error("Web Audio API is not supported in this browser", e);
                     alert("Sorry, your browser doesn't support the Web Audio API needed for sound.");
                 }
             } else if (audioContext.state === 'suspended') {
-                // If context exists but is suspended, resume it
-                audioContext.resume().catch(err => console.error('Error resuming audio context:', err));
+                console.log('Context exists but is suspended. Attempting to resume...');
+                audioContext.resume().then(() => {
+                    console.log('Existing context resumed successfully.', audioContext.state);
+                }).catch(err => console.error('Error resuming existing context:', err));
+            } else {
+                console.log('AudioContext already exists and is running.', audioContext.state);
             }
         }
 
@@ -306,7 +316,17 @@
         // --- Play Note based on Scale and X-Position ---
         // Modified to accept optional startTime for scheduled playback
         function playNote(xPosition, scale, startTime = null) {
-            if (!audioContext || !scale) return;
+            console.log(`playNote called: x=${xPosition}, scale=${scale?.name}, startTime=${startTime}`); // Added Log
+            if (!audioContext || !scale) {
+                console.warn('playNote aborted: No audioContext or scale.');
+                return;
+            }
+            if (audioContext.state !== 'running') {
+                console.warn(`playNote called but audioContext is not running. State: ${audioContext.state}`);
+                // Optionally try resuming again, though it might indicate a deeper issue
+                // initializeAudio(); 
+                // return; // Might abort here if context isn't running
+            }
 
             // Normalize X across the entire screen width
             const relativeX = xPosition / window.innerWidth;
@@ -496,9 +516,10 @@
 
         // Add touchstart listener for mobile interaction
         container.addEventListener('touchstart', (e) => {
+            console.log('touchstart event fired'); // Added Log
             // Ensure audio is ready on first touch
             initializeAudio(); 
-
+            
             // Prevent touch from ALSO triggering mousedown/click events immediately
             e.preventDefault(); 
 
