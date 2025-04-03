@@ -346,20 +346,34 @@
 
             const frequency = getFrequency(totalSemitones);
 
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
+            console.log(`Attempting to play frequency: ${frequency}`); // Log frequency
 
-            oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(frequency, startTime || audioContext.currentTime);
+            try {
+                const oscillator = audioContext.createOscillator();
+                // const gainNode = audioContext.createGain(); // TEMP: Bypass GainNode
 
-            gainNode.gain.setValueAtTime(0.4, startTime || audioContext.currentTime); // Slightly lower volume
-            gainNode.gain.exponentialRampToValueAtTime(0.001, (startTime || audioContext.currentTime) + 0.75);
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(frequency, startTime || audioContext.currentTime);
 
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
+                // TEMP: Set fixed gain directly on oscillator (if possible - usually needs GainNode)
+                // Let's just connect directly for now to test sound output
+                // gainNode.gain.setValueAtTime(0.4, startTime || audioContext.currentTime);
+                // gainNode.gain.exponentialRampToValueAtTime(0.001, (startTime || audioContext.currentTime) + 0.75);
 
-            oscillator.start(startTime || audioContext.currentTime);
-            oscillator.stop((startTime || audioContext.currentTime) + 0.8);
+                // oscillator.connect(gainNode);
+                // gainNode.connect(audioContext.destination);
+
+                // TEMP: Connect oscillator directly to destination
+                oscillator.connect(audioContext.destination); 
+                console.log('Oscillator connected directly to destination'); // Log connection
+
+                oscillator.start(startTime || audioContext.currentTime);
+                // Stop after a short duration for testing
+                oscillator.stop((startTime || audioContext.currentTime) + 0.5); 
+                console.log('Oscillator started and scheduled to stop'); // Log start/stop
+            } catch (err) {
+                console.error('Error during oscillator creation/playback:', err);
+            }
         }
 
         // --- Dot Creation ---
@@ -837,7 +851,7 @@
                 loopPlaybackTimeouts.push(timeoutId);
             } else if (isPlaying) { // Only log/stop if we were intending to play (and in sync mode)
                 console.log("Sync loop cycle ended, but no notes found/played. Stopping.");
-                stopAllLoops(); // Stop if maxDuration is 0 or only muted loops exist
+                stopAllLoops(); // Stop playback if maxDuration is 0 or only muted loops exist
             } else {
                 console.log("runLoopCycle: Playback stopped during cycle execution.")
             }
