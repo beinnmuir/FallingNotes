@@ -24,7 +24,7 @@ A simple interactive music application where clicking or dragging creates fallin
 
 *   **Interactive Music Creation:** Click or drag on the screen to create falling notes.
 *   **Vertical Zones for Scales:** The vertical starting position determines the musical scale (Major, Pentatonic, Blues, Minor, etc.).
-*   **Horizontal Position for Pitch:** The horizontal starting position determines the pitch within the selected scale (2-octave range).
+*   **Horizontal Position for Pitch:** The horizontal starting position determines the pitch within the selected scale (3-octave range from C2 to C5).
 *   **Color-Coded Notes:** Notes are colored based on the scale (hue) and pitch (lightness).
 *   **Multi-Layer Looping:**
     *   Record multiple independent loops.
