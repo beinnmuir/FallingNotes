@@ -280,7 +280,7 @@
         let zoneHeight = window.innerHeight / numZones;
 
         // --- Sound Setup ---
-        function initializeAudio() {
+        async function initializeAudio() { 
             console.log('initializeAudio called');
             if (!audioContext) {
                 try {
@@ -290,22 +290,35 @@
                     // Check if context is suspended and resume it (needed for mobile)
                     if (audioContext.state === 'suspended') {
                         console.log('Attempting to resume new suspended context...');
-                        audioContext.resume().then(() => {
+                        // Return the promise from resume()
+                        return audioContext.resume().then(() => {
                             console.log('Context resumed successfully.', audioContext.state);
-                        }).catch(err => console.error('Error resuming new context:', err));
+                        }).catch(err => {
+                             console.error('Error resuming new context:', err);
+                             throw err; // Re-throw error to be caught by caller
+                        });
                     }
                 } catch (e) {
                     console.error("Web Audio API is not supported in this browser", e);
                     alert("Sorry, your browser doesn't support the Web Audio API needed for sound.");
+                    return Promise.reject(e); // Return a rejected promise
                 }
             } else if (audioContext.state === 'suspended') {
                 console.log('Context exists but is suspended. Attempting to resume...');
-                audioContext.resume().then(() => {
+                 // Return the promise from resume()
+                return audioContext.resume().then(() => {
                     console.log('Existing context resumed successfully.', audioContext.state);
-                }).catch(err => console.error('Error resuming existing context:', err));
+                }).catch(err => {
+                    console.error('Error resuming existing context:', err);
+                    throw err; // Re-throw error to be caught by caller
+                });
             } else {
                 console.log('AudioContext already exists and is running.', audioContext.state);
+                // Context is ready, return a resolved promise
+                return Promise.resolve(); 
             }
+            // Ensure a resolved promise is returned if context was created and not suspended
+            return Promise.resolve(); 
         }
 
         // --- Calculate Frequency from Scale Note ---
@@ -316,17 +329,16 @@
         // --- Play Note based on Scale and X-Position ---
         // Modified to accept optional startTime for scheduled playback
         function playNote(xPosition, scale, startTime = null) {
-            console.log(`playNote called: x=${xPosition}, scale=${scale?.name}, startTime=${startTime}`); // Added Log
+            console.log(`playNote called: x=${xPosition}, scale=${scale?.name}, startTime=${startTime}`);
             if (!audioContext || !scale) {
                 console.warn('playNote aborted: No audioContext or scale.');
                 return;
             }
-            if (audioContext.state !== 'running') {
-                console.warn(`playNote called but audioContext is not running. State: ${audioContext.state}`);
-                // Optionally try resuming again, though it might indicate a deeper issue
-                // initializeAudio(); 
-                // return; // Might abort here if context isn't running
-            }
+            // We should now only reach here if context is running due to await in handlers
+            // if (audioContext.state !== 'running') { 
+            //    console.warn(`playNote called but audioContext is not running. State: ${audioContext.state}`);
+            //    return; 
+            // }
 
             // Normalize X across the entire screen width
             const relativeX = xPosition / window.innerWidth;
@@ -346,31 +358,28 @@
 
             const frequency = getFrequency(totalSemitones);
 
-            console.log(`Attempting to play frequency: ${frequency}`); // Log frequency
+            console.log(`Attempting to play frequency: ${frequency}`);
 
             try {
                 const oscillator = audioContext.createOscillator();
-                // const gainNode = audioContext.createGain(); // TEMP: Bypass GainNode
+                const gainNode = audioContext.createGain(); // Re-enabled GainNode
 
                 oscillator.type = 'sine';
                 oscillator.frequency.setValueAtTime(frequency, startTime || audioContext.currentTime);
 
-                // TEMP: Set fixed gain directly on oscillator (if possible - usually needs GainNode)
-                // Let's just connect directly for now to test sound output
-                // gainNode.gain.setValueAtTime(0.4, startTime || audioContext.currentTime);
-                // gainNode.gain.exponentialRampToValueAtTime(0.001, (startTime || audioContext.currentTime) + 0.75);
+                // Re-enabled GainNode settings
+                gainNode.gain.setValueAtTime(0.4, startTime || audioContext.currentTime); // Slightly lower volume
+                gainNode.gain.exponentialRampToValueAtTime(0.001, (startTime || audioContext.currentTime) + 0.75);
 
-                // oscillator.connect(gainNode);
-                // gainNode.connect(audioContext.destination);
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
 
-                // TEMP: Connect oscillator directly to destination
-                oscillator.connect(audioContext.destination); 
-                console.log('Oscillator connected directly to destination'); // Log connection
+                console.log('Oscillator connected via GainNode to destination');
 
                 oscillator.start(startTime || audioContext.currentTime);
-                // Stop after a short duration for testing
-                oscillator.stop((startTime || audioContext.currentTime) + 0.5); 
-                console.log('Oscillator started and scheduled to stop'); // Log start/stop
+                // Restore original stop time
+                oscillator.stop((startTime || audioContext.currentTime) + 0.8); 
+                console.log('Oscillator started and scheduled to stop');
             } catch (err) {
                 console.error('Error during oscillator creation/playback:', err);
             }
@@ -501,9 +510,17 @@
 
             if (!isDragging) { createDot(event); }
         });
-        container.addEventListener('mousedown', (e) => {
-            // Ensure audio is ready on first click
-            initializeAudio(); 
+        // Make the handler async
+        container.addEventListener('mousedown', async (e) => {
+            console.log('mousedown event fired');
+            try {
+                 // Wait for audio context to be ready
+                await initializeAudio();
+                console.log('Audio context ready after mousedown.');
+            } catch (err) {
+                 console.error('Failed to initialize audio on mousedown:', err);
+                 return; // Don't proceed if audio failed
+            }
             
             isDragging = true;
             createDot(e); // Create dot on initial click
@@ -528,14 +545,20 @@
             isDragging = false;
         });
 
-        // Add touchstart listener for mobile interaction
-        container.addEventListener('touchstart', (e) => {
-            console.log('touchstart event fired'); // Added Log
-            // Ensure audio is ready on first touch
-            initializeAudio(); 
-            
+        // Make the handler async
+        container.addEventListener('touchstart', async (e) => {
+            console.log('touchstart event fired'); 
             // Prevent touch from ALSO triggering mousedown/click events immediately
             e.preventDefault(); 
+
+            try {
+                // Wait for audio context to be ready
+                await initializeAudio(); 
+                console.log('Audio context ready after touchstart.');
+            } catch (err) {
+                console.error('Failed to initialize audio on touchstart:', err);
+                return; // Don't proceed if audio failed
+            }
 
             isDragging = true;
             // Get touch coordinates
