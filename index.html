@@ -560,6 +560,27 @@
                 return; // Don't proceed if audio failed
             }
 
+            console.log('Attempting direct audio test...');
+            try {
+                if (audioContext && audioContext.state === 'running') {
+                    const testOsc = audioContext.createOscillator();
+                    const testGain = audioContext.createGain();
+                    testOsc.type = 'sine';
+                    testOsc.frequency.setValueAtTime(440, audioContext.currentTime); // A4 note
+                    testGain.gain.setValueAtTime(0.5, audioContext.currentTime);
+                    testGain.gain.linearRampToValueAtTime(0.001, audioContext.currentTime + 0.5);
+                    testOsc.connect(testGain);
+                    testGain.connect(audioContext.destination);
+                    testOsc.start(audioContext.currentTime);
+                    testOsc.stop(audioContext.currentTime + 0.5);
+                    console.log('Direct audio test sound PLAYED (or at least attempted).');
+                } else {
+                    console.warn('Direct audio test SKIPPED - AudioContext not ready.');
+                }
+            } catch (testErr) {
+                console.error('Error during direct audio test:', testErr);
+            }
+
             isDragging = true;
             // Get touch coordinates
             const touch = e.touches[0]; 
