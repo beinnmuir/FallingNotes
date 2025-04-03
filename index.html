@@ -343,18 +343,8 @@
                 return;
             }
 
-            // --- DEBUG LOGGING START ---
-            console.log(`--- playNote Debug ---`);
-            console.log(`Raw xPosition: ${xPosition}`);
-            console.log(`window.innerWidth: ${window.innerWidth}`);
-            // --- DEBUG LOGGING END ---
-
             // Normalize X across the entire screen width
             const relativeX = xPosition / window.innerWidth;
-
-            // --- DEBUG LOGGING START ---
-            console.log(`Calculated relativeX: ${relativeX}`);
-            // --- DEBUG LOGGING END ---
 
             const intervals = scale.intervals;
             // Map relativeX to an index in the scale's intervals array
@@ -370,18 +360,6 @@
             const totalSemitones = semitones + (octaveShift * 12);
 
             const frequency = getFrequency(totalSemitones);
-
-            // --- DEBUG LOGGING START ---
-            console.log(`Scale Intervals: [${intervals.join(', ')}]`);
-            console.log(`Total Notes in Span (across ${octavesToSpan} octaves): ${totalNotesInSpan}`);
-            console.log(`Calculated noteIndexOverall: ${noteIndexOverall}`);
-            console.log(`Calculated noteIndexInScale: ${noteIndexInScale}`);
-            console.log(`Calculated octaveShift: ${octaveShift}`);
-            console.log(`Semitones from scale[${noteIndexInScale}]: ${semitones}`);
-            console.log(`Final totalSemitones: ${totalSemitones}`);
-            console.log(`Calculated frequency: ${frequency}`);
-            console.log(`----------------------`);
-            // --- DEBUG LOGGING END ---
 
             try {
                 const oscillator = audioContext.createOscillator();
@@ -508,7 +486,9 @@
                 label.classList.add('zone-label');
                 const scaleName = scales[scaleOrder[i]].name;
                 const scaleHue = scales[scaleOrder[i]].colorHue;
-                label.textContent = scaleName;
+                // Capitalize the first letter of each word
+                const capitalizedScaleName = scaleName.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                label.textContent = capitalizedScaleName; // Use the capitalized version
                 // Center label vertically within its zone
                 const labelY = (i * zoneHeight) + (zoneHeight / 2);
                 label.style.top = `${labelY}px`;
