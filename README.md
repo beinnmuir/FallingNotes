@@ -5,9 +5,10 @@ A simple interactive music application where clicking or dragging creates fallin
 ## How to Use
 
 1.  **Open `index.html`:** Open the `index.html` file in a web browser.
-2.  **Create Notes:** Click or drag anywhere on the main area of the screen. Dots will appear and fall downwards.
-3.  **Sound:** When a dot reaches the bottom, it will play a note corresponding to its horizontal position within a scale determined by its vertical starting position.
-4.  **Looping:**
+2.  **Enable Sound:** Click the "Turn on Sound" button (top-left) to allow audio playback. This is required by browsers before sound can start.
+3.  **Create Notes:** Click or drag anywhere on the main area of the screen. Dots will appear and fall downwards.
+4.  **Sound:** When a dot reaches the bottom, it will play a note corresponding to its horizontal position within a scale determined by its vertical starting position.
+5.  **Looping:**
     *   **Enable/Disable:** Click the "Enable Loop Mode" button on the right panel to show the controls. Click "Disable Loop Mode" to hide them.
     *   **Add Layer:** Click "Add Loop Layer" to create a new loop track.
     *   **Select:** Click the "Select" button on the desired loop layer to make it active for recording.

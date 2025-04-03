@@ -208,14 +208,15 @@
         #enable-sound-button {
             display: none; /* Hidden by default */
             padding: 5px 10px;
-            margin-top: 10px;
-            margin-bottom: 10px;
-            font-size: 0.9em;
+            font-size: 12px; /* Match loop controls */
             cursor: pointer;
             background-color: #f0f0f0;
             color: #333;
-            border: 1px solid #ccc;
-            border-radius: 5px;
+            border: 1px solid #aaa; /* Match loop controls */
+            border-radius: 3px; /* Match loop controls */
+            min-width: 80px; /* Match loop controls */
+            text-align: center;
+            margin: 0; /* Remove margins */
         }
         #enable-sound-button:hover {
             background-color: #e0e0e0;
@@ -228,8 +229,12 @@
         #sound-enable-container {
             position: absolute;
             top: 10px;
-            left: 75px; /* Adjusted from 10px to 75px */
-            z-index: 1001; /* Ensure it's above other elements potentially */
+            left: 75px;
+            z-index: 1001;
+            background-color: rgba(173, 216, 230, 0.6);
+            padding: 10px; /* Match loop controls padding */
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2); /* Match loop controls shadow */
         }
     </style>
 </head>
@@ -1049,8 +1054,8 @@
                         console.log('Attempting to resume AudioContext...');
                         await audioContext.resume();
                         console.log('AudioContext resumed successfully.', audioContext.state);
-                        enableSoundButton.classList.remove('show'); // Hide button on success
-                        enableSoundButton.style.display = 'none'; // Ensure it's hidden
+                        // Hide the entire container instead of just the button
+                        soundEnableContainer.style.display = 'none';
                     } catch (err) {
                         console.error('Error resuming AudioContext:', err);
                         alert('Could not enable sound. Please try reloading.');
@@ -1058,8 +1063,8 @@
                 } else {
                     // Should not happen if button is only shown when suspended, but good practice
                     console.log('AudioContext already running or not available.');
-                    enableSoundButton.classList.remove('show');
-                    enableSoundButton.style.display = 'none'; 
+                    // Hide the entire container
+                    soundEnableContainer.style.display = 'none';
                 }
             });
         } else if (audioContext) {
